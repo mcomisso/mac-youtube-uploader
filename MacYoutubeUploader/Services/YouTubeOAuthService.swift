@@ -23,8 +23,11 @@ struct YouTubeOAuthService {
             state: state
         )
 
-        await MainActor.run {
-            _ = NSWorkspace.shared.open(authURL)
+        let didOpenBrowser = await MainActor.run {
+            NSWorkspace.shared.open(authURL)
+        }
+        guard didOpenBrowser else {
+            throw AppError.oauthBrowserLaunchFailed
         }
 
         let callback = try await server.waitForCallback()

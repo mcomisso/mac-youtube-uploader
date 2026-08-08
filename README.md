@@ -10,7 +10,7 @@ The current release requires macOS 26.5 or later. After downloading, unzip the a
 
 ## YouTube setup
 
-The app uses Google OAuth with PKCE and stores connected-channel credentials in the macOS Keychain. Import a Google OAuth desktop client JSON file from Settings before connecting a YouTube channel.
+The app includes its public Google OAuth desktop client ID, uses OAuth with PKCE, and stores connected-channel credentials in the macOS Keychain. Accept the privacy policy and terms, then choose Sign in with Google. The Expert setting can import a separate desktop client JSON file when you intentionally want to use your own Google Cloud project and YouTube API quota.
 
 Never commit or distribute a `client_secret.json` file with the app. The local OAuth client configuration path is ignored by git.
 

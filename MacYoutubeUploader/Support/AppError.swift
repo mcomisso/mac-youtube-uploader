@@ -2,6 +2,7 @@ import Foundation
 
 enum AppError: LocalizedError {
     case missingOAuthClientID
+    case oauthBrowserLaunchFailed
     case oauthStateMismatch
     case oauthDenied(String)
     case legalAgreementRequired
@@ -19,6 +20,8 @@ enum AppError: LocalizedError {
         switch self {
         case .missingOAuthClientID:
             "Enter a Google OAuth desktop client ID in settings first."
+        case .oauthBrowserLaunchFailed:
+            "Google sign-in could not open in your web browser. Check your default browser and try again."
         case .oauthStateMismatch:
             "Google sign-in returned an unexpected state value. Try connecting again."
         case .oauthDenied(let message):
