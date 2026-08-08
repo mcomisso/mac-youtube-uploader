@@ -1,0 +1,7 @@
+.DS_Store
+xcuserdata/
+DerivedData/
+MacYoutubeUploader/Resources/OAuthClient/client_secret.json
+!MacYoutubeUploader.xcodeproj/
+!MacYoutubeUploader.xcodeproj/**
+MacYoutubeUploader.xcodeproj/**/xcuserdata/
