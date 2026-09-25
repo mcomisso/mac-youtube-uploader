@@ -81,29 +81,69 @@ private struct QueueHeaderActions: View {
     @ObservedObject var uploads: UploadStore
 
     var body: some View {
-        HStack(spacing: 10) {
-            Button {
-                uploads.chooseAndEnqueueFiles()
-            } label: {
-                Label("Open Files", systemImage: "plus")
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                openFilesButton
+                combineFilesButton
+                cancelButton
+                startQueueButton
             }
-            .buttonStyle(SecondaryAppButtonStyle())
 
-            if uploads.cancellableCount > 0 {
-                Button {
-                    uploads.cancelAllCancellableJobs()
+            HStack(spacing: 10) {
+                Menu {
+                    Button("Open Files", systemImage: "plus") {
+                        uploads.chooseAndEnqueueFiles()
+                    }
+                    Button("Combine Files", systemImage: "square.stack.3d.up") {
+                        uploads.chooseAndEnqueueCombinedFiles()
+                    }
                 } label: {
-                    Label("Cancel", systemImage: "xmark.circle.fill")
+                    Label("Add Videos", systemImage: "plus")
                 }
                 .buttonStyle(SecondaryAppButtonStyle())
-            }
 
-            Button {
-                uploads.startQueuedUploads()
-            } label: {
-                Label("Start Queue", systemImage: "play.fill")
+                cancelButton
+                startQueueButton
             }
-            .buttonStyle(PrimaryAppButtonStyle())
         }
+    }
+
+    private var openFilesButton: some View {
+        Button {
+            uploads.chooseAndEnqueueFiles()
+        } label: {
+            Label("Open Files", systemImage: "plus")
+        }
+        .buttonStyle(SecondaryAppButtonStyle())
+    }
+
+    private var combineFilesButton: some View {
+        Button {
+            uploads.chooseAndEnqueueCombinedFiles()
+        } label: {
+            Label("Combine Files", systemImage: "square.stack.3d.up")
+        }
+        .buttonStyle(SecondaryAppButtonStyle())
+    }
+
+    @ViewBuilder
+    private var cancelButton: some View {
+        if uploads.cancellableCount > 0 {
+            Button {
+                uploads.cancelAllCancellableJobs()
+            } label: {
+                Label("Cancel", systemImage: "xmark.circle.fill")
+            }
+            .buttonStyle(SecondaryAppButtonStyle())
+        }
+    }
+
+    private var startQueueButton: some View {
+        Button {
+            uploads.startQueuedUploads()
+        } label: {
+            Label("Start Queue", systemImage: "play.fill")
+        }
+        .buttonStyle(PrimaryAppButtonStyle())
     }
 }

@@ -11,6 +11,7 @@ final class OAuthLoopbackServer {
 
     private let listener: NWListener
     private let expectedState: String
+    private let callbackTimeout: TimeInterval
     private let queue = DispatchQueue(label: "com.matcom.MacYouTubeUploader.oauth-loopback")
     private var readyContinuation: CheckedContinuation<UInt16, Error>?
     private var callbackContinuation: CheckedContinuation<OAuthCallback, Error>?
@@ -18,8 +19,9 @@ final class OAuthLoopbackServer {
     private var hasResolvedReady = false
     private var hasResolvedCallback = false
 
-    init(expectedState: String) throws {
+    init(expectedState: String, callbackTimeout: TimeInterval = 300) throws {
         self.expectedState = expectedState
+        self.callbackTimeout = callbackTimeout
         self.listener = try NWListener(using: .tcp, on: .any)
     }
 
@@ -40,15 +42,31 @@ final class OAuthLoopbackServer {
     }
 
     func waitForCallback() async throws -> OAuthCallback {
-        try await withCheckedThrowingContinuation { continuation in
-            queue.async {
-                if let result = self.pendingCallbackResult {
-                    self.pendingCallbackResult = nil
-                    continuation.resume(with: result)
-                    return
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                queue.async {
+                    if let result = self.pendingCallbackResult {
+                        self.pendingCallbackResult = nil
+                        continuation.resume(with: result)
+                        return
+                    }
+                    self.callbackContinuation = continuation
+                    self.queue.asyncAfter(deadline: .now() + self.callbackTimeout) {
+                        guard !self.hasResolvedCallback else { return }
+                        self.resolveCallbackIfNeeded(with: .failure(AppError.oauthTimedOut))
+                        self.listener.cancel()
+                    }
                 }
-                self.callbackContinuation = continuation
             }
+        } onCancel: {
+            stop()
+        }
+    }
+
+    func stop() {
+        queue.async {
+            self.resolveCallbackIfNeeded(with: .failure(CancellationError()))
+            self.listener.cancel()
         }
     }
 

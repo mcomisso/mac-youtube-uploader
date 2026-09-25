@@ -248,7 +248,7 @@ private struct JobThumbnail: View {
                 )
             }
 
-            Text(job.chunkCount > 1 ? "\(job.chunkCount) chunks" : "video")
+            Text(job.chunkCount > 1 ? "\(job.chunkCount) files" : "video")
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 7)

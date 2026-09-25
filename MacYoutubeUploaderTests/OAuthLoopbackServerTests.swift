@@ -41,6 +41,18 @@ final class OAuthLoopbackServerTests: XCTestCase {
         }
     }
 
+    func testTimesOutWhenBrowserDoesNotReturn() async throws {
+        let server = try OAuthLoopbackServer(expectedState: "expected-state", callbackTimeout: 0.05)
+        _ = try await server.start()
+
+        do {
+            _ = try await server.waitForCallback()
+            XCTFail("Expected a timeout when no callback arrives")
+        } catch AppError.oauthTimedOut {
+            // The pending sign-in is released so the user can retry.
+        }
+    }
+
     private func get(_ urlString: String) async throws -> Int? {
         let url = try XCTUnwrap(URL(string: urlString))
         var request = URLRequest(url: url)

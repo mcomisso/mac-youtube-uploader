@@ -9,7 +9,7 @@ enum OAuthClientConfigImportError: LocalizedError {
         case .unreadable:
             "The selected file could not be read."
         case .invalidFormat:
-            "The selected file is not a Google OAuth client JSON file. Download the desktop client JSON from Google Cloud Console and try again."
+            "The selected file is not a Google OAuth desktop client JSON file. Download a Desktop app client JSON from Google Cloud Console and try again."
         }
     }
 }
@@ -31,7 +31,7 @@ enum OAuthClientConfigLoader {
         }
 
         guard let credentials = try? JSONDecoder().decode(GoogleOAuthClientJSON.self, from: data),
-              let client = credentials.installed ?? credentials.web else {
+              let client = credentials.installed else {
             throw OAuthClientConfigImportError.invalidFormat
         }
 
@@ -106,7 +106,6 @@ enum OAuthClientConfigLoader {
 
 private struct GoogleOAuthClientJSON: Decodable {
     var installed: GoogleOAuthClient?
-    var web: GoogleOAuthClient?
 }
 
 private struct GoogleOAuthClient: Decodable {

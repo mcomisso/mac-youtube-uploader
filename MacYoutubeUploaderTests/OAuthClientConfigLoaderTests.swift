@@ -33,14 +33,13 @@ final class OAuthClientConfigLoaderTests: XCTestCase {
         XCTAssertEqual(config.clientSecret, "shhh")
     }
 
-    func testImportsWebClientJSONWithoutSecret() throws {
+    func testRejectsWebClientJSONBecauseLoopbackSignInRequiresDesktopClient() throws {
         let url = try makeJSONFile(#"{"web":{"client_id":"web-client-id"}}"#)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let config = try OAuthClientConfigLoader.importConfig(from: url)
-
-        XCTAssertEqual(config.clientID, "web-client-id")
-        XCTAssertEqual(config.clientSecret, "")
+        XCTAssertThrowsError(try OAuthClientConfigLoader.importConfig(from: url)) { error in
+            XCTAssertEqual(error as? OAuthClientConfigImportError, .invalidFormat)
+        }
     }
 
     func testThrowsForNonGoogleJSON() throws {

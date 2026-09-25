@@ -1,6 +1,6 @@
 # OAuth Client
 
-Place a Google OAuth desktop client JSON file here as `client_secret.json` only for local development.
+Place a Google OAuth Desktop app client JSON file here as `client_secret.json` only for local development. Web application client JSON cannot use this app's dynamic loopback redirect.
 
 The simplest persistent option is the Import Client JSON button in the app's YouTube
 settings, which stores the client ID and secret so sign-in works on every launch. The app

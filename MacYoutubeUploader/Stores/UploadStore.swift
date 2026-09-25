@@ -9,6 +9,7 @@ protocol UploadPreferencesProviding: AnyObject {
     var authorizedChannels: [AuthorizedChannel] { get }
     var selectedPlaylistID: String? { get }
     var oauthConfig: OAuthClientConfig { get }
+    func oauthConfig(for channel: AuthorizedChannel) -> OAuthClientConfig
     var startsUploadsAutomatically: Bool { get }
     var keepMacAwake: Bool { get }
     var hasAcceptedRequiredPolicies: Bool { get }
@@ -17,6 +18,12 @@ protocol UploadPreferencesProviding: AnyObject {
     func selectedPlaylistID(for channelID: String) -> String?
     func playlist(id: String, channelID: String) -> YouTubePlaylist?
     func updateCredentials(_ credentials: OAuthCredentials, for channelID: String)
+}
+
+extension UploadPreferencesProviding {
+    func oauthConfig(for channel: AuthorizedChannel) -> OAuthClientConfig {
+        oauthConfig
+    }
 }
 
 extension PreferencesStore: UploadPreferencesProviding {}
@@ -217,8 +224,50 @@ final class UploadStore: ObservableObject {
         enqueue(urls)
     }
 
+    func chooseAndEnqueueCombinedFiles() {
+        let urls = selector.chooseVideosToCombine()
+        guard !urls.isEmpty else { return }
+        enqueueCombined(urls)
+    }
+
     func enqueue(_ urls: [URL]) {
-        let groups = resolver.resolve(urls: urls)
+        enqueue(groups: resolver.resolve(urls: urls))
+    }
+
+    func enqueueCombined(_ urls: [URL]) {
+        guard urls.count >= 2 else {
+            errorMessage = "Choose at least two video files to combine."
+            return
+        }
+
+        let paths = urls.map { $0.standardizedFileURL.path }
+        guard Set(paths).count == paths.count else {
+            errorMessage = "Choose each video file only once."
+            return
+        }
+
+        if let invalidURL = urls.first(where: {
+            !$0.isSupportedVideoFile || ($0.fileSize ?? 0) <= 0
+        }) {
+            errorMessage = "Cannot combine \(invalidURL.lastPathComponent). Choose nonempty video files."
+            return
+        }
+
+        let orderedURLs = urls.sorted { left, right in
+            let order = left.lastPathComponent.localizedStandardCompare(right.lastPathComponent)
+            return order == .orderedSame
+                ? left.standardizedFileURL.path < right.standardizedFileURL.path
+                : order == .orderedAscending
+        }
+        let group = ResolvedUploadGroup(
+            sourceURLs: orderedURLs,
+            titleSeed: orderedURLs[0].deletingPathExtension().lastPathComponent
+        )
+        errorMessage = nil
+        enqueue(groups: [group])
+    }
+
+    private func enqueue(groups: [ResolvedUploadGroup]) {
         guard !groups.isEmpty else { return }
 
         let channelID = preferences.selectedChannelID
@@ -440,7 +489,7 @@ final class UploadStore: ObservableObject {
                 snapshot.metadata,
                 channel,
                 selectedPlaylistID,
-                preferences.oauthConfig,
+                preferences.oauthConfig(for: channel),
                 resumeSessionURL(for: snapshot, uploadURL: uploadURL),
                 { [weak self] sessionURL in
                     let uploadFileSize = uploadURL.fileSize
@@ -595,7 +644,7 @@ final class UploadStore: ObservableObject {
             job.phase = snapshot.chunkCount > 1 ? .reconstructing : .preparing
             job.progress = 0
             job.detail = snapshot.chunkCount > 1
-                ? "Reconstructing \(snapshot.chunkCount) chunks"
+                ? "Combining \(snapshot.chunkCount) files"
                 : "Preparing \(snapshot.sourceURLs.first?.lastPathComponent ?? "video")"
         }
 
@@ -608,7 +657,7 @@ final class UploadStore: ObservableObject {
                     self?.update(jobID) { job in
                         guard case .reconstructing = job.phase else { return }
                         job.progress = clampedProgress
-                        job.detail = "Remuxing \(snapshot.chunkCount) chunks (\(Int((clampedProgress * 100).rounded()))%)"
+                        job.detail = "Combining \(snapshot.chunkCount) files (\(Int((clampedProgress * 100).rounded()))%)"
                     }
                 }
             }

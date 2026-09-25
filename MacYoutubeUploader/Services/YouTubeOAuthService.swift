@@ -14,6 +14,7 @@ struct YouTubeOAuthService {
         let verifier = PKCE.verifier()
         let state = PKCE.state()
         let server = try OAuthLoopbackServer(expectedState: state)
+        defer { server.stop() }
         let port = try await server.start()
         let redirectURI = "http://127.0.0.1:\(port)\(OAuthLoopbackServer.callbackPath)"
         let authURL = try authorizationURL(
@@ -63,7 +64,8 @@ struct YouTubeOAuthService {
             refreshToken: credentials.refreshToken,
             tokenType: response.tokenType,
             expiresAt: Date().addingTimeInterval(TimeInterval(max(response.expiresIn - 60, 60))),
-            scope: response.scope ?? credentials.scope
+            scope: response.scope ?? credentials.scope,
+            clientConfig: credentials.clientConfig ?? config
         )
     }
 
@@ -202,7 +204,8 @@ struct YouTubeOAuthService {
             refreshToken: refreshToken,
             tokenType: response.tokenType,
             expiresAt: Date().addingTimeInterval(TimeInterval(max(response.expiresIn - 60, 60))),
-            scope: response.scope
+            scope: response.scope,
+            clientConfig: config
         )
     }
 

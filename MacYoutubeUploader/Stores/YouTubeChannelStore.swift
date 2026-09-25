@@ -83,6 +83,21 @@ final class YouTubeChannelStore: ObservableObject {
         }
         normalizeSelectedPlaylistID(for: selectedChannelID)
 
+        // Previous versions stored the tokens without their issuing client.
+        // Bind them to the selected client before a later settings change can
+        // make refresh requests use a different Google Cloud project.
+        let legacyClientConfig = oauthConfig
+        if legacyClientConfig.hasClientID {
+            var migratedChannels = authorizedChannels
+            for index in migratedChannels.indices where migratedChannels[index].credentials.clientConfig == nil {
+                migratedChannels[index].credentials.clientConfig = legacyClientConfig
+            }
+            if migratedChannels != authorizedChannels {
+                authorizedChannels = migratedChannels
+                persistChannels()
+            }
+        }
+
         if legacyOAuthClientSecret != nil {
             persistOAuthClientSecret()
             defaults.removeObject(forKey: Keys.oauthClientSecretLegacy)
@@ -115,10 +130,14 @@ final class YouTubeChannelStore: ObservableObject {
 
     var oauthConfig: OAuthClientConfig {
         let manualConfig = OAuthClientConfig(clientID: oauthClientID, clientSecret: oauthClientSecret)
-        if usesCustomOAuthClient, manualConfig.hasClientID {
+        if usesCustomOAuthClient {
             return manualConfig
         }
         return bundledOAuthConfig ?? manualConfig
+    }
+
+    func oauthConfig(for channel: AuthorizedChannel) -> OAuthClientConfig {
+        channel.credentials.oauthConfig(fallback: oauthConfig)
     }
 
     var hasBundledOAuthConfig: Bool {
@@ -144,12 +163,13 @@ final class YouTubeChannelStore: ObservableObject {
             return
         }
 
+        let config = oauthConfig
         isConnecting = true
         errorMessage = nil
 
         Task {
             do {
-                let credentials = try await oauth.signIn(config: oauthConfig)
+                let credentials = try await oauth.signIn(config: config)
                 let channels = try await oauth.fetchChannels(
                     accessToken: credentials.accessToken,
                     credentials: credentials
@@ -236,7 +256,11 @@ final class YouTubeChannelStore: ObservableObject {
             return
         }
         var updatedChannels = authorizedChannels
-        updatedChannels[index].credentials = credentials
+        var updatedCredentials = credentials
+        if updatedCredentials.clientConfig == nil {
+            updatedCredentials.clientConfig = updatedChannels[index].credentials.clientConfig
+        }
+        updatedChannels[index].credentials = updatedCredentials
         authorizedChannels = updatedChannels
     }
 
@@ -293,7 +317,7 @@ final class YouTubeChannelStore: ObservableObject {
             return
         }
 
-        guard oauthConfig.hasClientID else {
+        guard authorizedChannels.allSatisfy({ oauthConfig(for: $0).hasClientID }) else {
             deleteStoredYouTubeDataLocally()
             errorMessage = "Stored YouTube data was older than 30 days and could not be refreshed because no OAuth client is configured. Connect YouTube again to continue."
             return
@@ -340,7 +364,7 @@ final class YouTubeChannelStore: ObservableObject {
     private func refreshPlaylists(for channel: AuthorizedChannel) async throws {
         var credentials = channel.credentials
         if credentials.needsRefresh {
-            credentials = try await oauth.refresh(credentials, config: oauthConfig)
+            credentials = try await oauth.refresh(credentials, config: oauthConfig(for: channel))
             updateCredentials(credentials, for: channel.id)
         }
 
@@ -371,7 +395,10 @@ final class YouTubeChannelStore: ObservableObject {
         for credential in uniqueCredentialSnapshots() {
             var credentials = credential
             if credentials.needsRefresh {
-                credentials = try await oauth.refresh(credentials, config: oauthConfig)
+                credentials = try await oauth.refresh(
+                    credentials,
+                    config: credentials.oauthConfig(fallback: oauthConfig)
+                )
             }
 
             let channels = try await oauth.fetchChannels(

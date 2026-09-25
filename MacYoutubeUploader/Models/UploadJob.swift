@@ -178,7 +178,7 @@ struct UploadJob: Identifiable, Equatable {
         self.phase = selectedChannelID == nil ? .waitingForAccount : .queued
         self.progress = 0
         self.detail = sourceURLs.count > 1
-            ? "\(sourceURLs.count) chunks detected"
+            ? "\(sourceURLs.count) files selected"
             : sourceURLs.first?.lastPathComponent ?? "Ready"
         self.createdAt = Date()
         self.selectedChannelID = selectedChannelID

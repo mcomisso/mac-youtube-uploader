@@ -115,6 +115,10 @@ extension PreferencesStore {
         channels.oauthConfig
     }
 
+    func oauthConfig(for channel: AuthorizedChannel) -> OAuthClientConfig {
+        channels.oauthConfig(for: channel)
+    }
+
     func selectedPlaylistID(for channelID: String) -> String? {
         channels.selectedPlaylistID(for: channelID)
     }

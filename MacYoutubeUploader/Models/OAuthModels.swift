@@ -1,6 +1,6 @@
 import Foundation
 
-struct OAuthClientConfig: Equatable {
+struct OAuthClientConfig: Codable, Equatable {
     var clientID: String
     var clientSecret: String
 
@@ -20,9 +20,16 @@ struct OAuthCredentials: Codable, Equatable {
     var tokenType: String
     var expiresAt: Date
     var scope: String?
+    /// The client that issued the refresh token. Older stored credentials are
+    /// filled in by YouTubeChannelStore when they are loaded.
+    var clientConfig: OAuthClientConfig? = nil
 
     var needsRefresh: Bool {
         expiresAt.timeIntervalSinceNow < 90
+    }
+
+    func oauthConfig(fallback: OAuthClientConfig) -> OAuthClientConfig {
+        clientConfig ?? fallback
     }
 }
 

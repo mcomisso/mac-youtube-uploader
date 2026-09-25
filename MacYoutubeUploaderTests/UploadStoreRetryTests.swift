@@ -218,6 +218,78 @@ final class UploadStoreRetryTests: XCTestCase {
         XCTAssertNil(store.errorMessage)
     }
 
+    func testCombineFilesCreatesOneUploadInFilenameOrder() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CombinedUploadTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let second = directory.appendingPathComponent("Part 2.mov")
+        let tenth = directory.appendingPathComponent("Part 10.mov")
+        let assembled = directory.appendingPathComponent("combined.mov")
+        for url in [second, tenth, assembled] {
+            try Data([0, 1, 2, 3]).write(to: url)
+        }
+
+        let assembler = UploadAssemblySpy(assembledURL: assembled)
+        let uploader = UploadVideoSpy(results: [
+            .success(YouTubeUploadResult(videoID: "combined-123", playlistID: nil, playlistErrorDescription: nil))
+        ])
+        let store = UploadStore(
+            preferences: MockUploadPreferences(),
+            assembleUploadFile: { sourceURLs, titleSeed, onProgress in
+                try await assembler.assemble(
+                    sourceURLs: sourceURLs,
+                    titleSeed: titleSeed,
+                    onProgress: onProgress
+                )
+            },
+            uploadVideoFile: { fileURL, metadata, channel, playlistID, oauthConfig, resumeSessionURL, onSessionEstablished, onProgress, onCredentialsRefreshed in
+                try await uploader.upload(
+                    fileURL: fileURL,
+                    metadata: metadata,
+                    channel: channel,
+                    playlistID: playlistID,
+                    oauthConfig: oauthConfig,
+                    onProgress: onProgress,
+                    onCredentialsRefreshed: onCredentialsRefreshed
+                )
+            },
+            activity: UploadActivitySpy()
+        )
+
+        store.enqueueCombined([tenth, second])
+        XCTAssertEqual(store.jobs.count, 1)
+        XCTAssertEqual(store.jobs.first?.sourceURLs, [second, tenth])
+        XCTAssertEqual(store.jobs.first?.titleSeed, "Part 2")
+
+        store.startQueuedUploads()
+        try await waitForStore(store) { $0.completedCount == 1 }
+
+        XCTAssertEqual(assembler.callCount, 1)
+        XCTAssertEqual(assembler.lastSourceURLs, [second, tenth])
+        XCTAssertEqual(uploader.uploadedFileURLs, [assembled])
+    }
+
+    func testCombineFilesRejectsInvalidSelections() throws {
+        let source = try makeTemporaryVideo()
+        defer { try? FileManager.default.removeItem(at: source) }
+        let store = UploadStore(preferences: MockUploadPreferences(), activity: UploadActivitySpy())
+
+        store.enqueueCombined([source])
+        XCTAssertEqual(store.jobs.count, 0)
+        XCTAssertEqual(store.errorMessage, "Choose at least two video files to combine.")
+
+        store.enqueueCombined([source, source])
+        XCTAssertEqual(store.jobs.count, 0)
+        XCTAssertEqual(store.errorMessage, "Choose each video file only once.")
+
+        let missing = source.deletingPathExtension().appendingPathExtension("mp4")
+        store.enqueueCombined([source, missing])
+        XCTAssertEqual(store.jobs.count, 0)
+        XCTAssertEqual(store.errorMessage, "Cannot combine \(missing.lastPathComponent). Choose nonempty video files.")
+    }
+
     private func waitForStore(
         _ store: UploadStore,
         timeout: TimeInterval = 2,
@@ -285,6 +357,7 @@ private final class MockUploadPreferences: UploadPreferencesProviding {
 private final class UploadAssemblySpy {
     private let assembledURL: URL
     private(set) var callCount = 0
+    private(set) var lastSourceURLs: [URL] = []
 
     init(assembledURL: URL) {
         self.assembledURL = assembledURL
@@ -296,6 +369,7 @@ private final class UploadAssemblySpy {
         onProgress: @escaping (Double) -> Void
     ) async throws -> URL {
         callCount += 1
+        lastSourceURLs = sourceURLs
         onProgress(1)
         return assembledURL
     }

@@ -1,6 +1,19 @@
 import Foundation
 import UniformTypeIdentifiers
 
+private let videoMIMETypes: [String: String] = [
+    "avi": "video/x-msvideo",
+    "m2ts": "video/mp2t",
+    "m4v": "video/mp4",
+    "mkv": "video/x-matroska",
+    "mov": "video/quicktime",
+    "mp4": "video/mp4",
+    "mpeg": "video/mpeg",
+    "mpg": "video/mpeg",
+    "mts": "video/mp2t",
+    "webm": "video/webm"
+]
+
 extension URL {
     var fileSize: Int64? {
         guard let values = try? resourceValues(forKeys: [.fileSizeKey, .totalFileAllocatedSizeKey]) else {
@@ -25,14 +38,20 @@ extension URL {
     }
 
     var probableVideoMimeType: String {
-        guard let type = UTType(filenameExtension: pathExtension) else {
-            return "video/mp4"
+        if let mimeType = videoMIMETypes[pathExtension.lowercased()] {
+            return mimeType
         }
-        return type.preferredMIMEType ?? "video/mp4"
+        guard let type = UTType(filenameExtension: pathExtension) else {
+            return "application/octet-stream"
+        }
+        return type.preferredMIMEType ?? "application/octet-stream"
     }
 
     var isSupportedVideoFile: Bool {
         guard !isDirectory else { return false }
+        if videoMIMETypes[pathExtension.lowercased()] != nil {
+            return true
+        }
         guard let type = UTType(filenameExtension: pathExtension) else {
             return false
         }

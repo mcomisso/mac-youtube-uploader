@@ -38,7 +38,7 @@ struct OAuthClientSettingsView: View {
                     }
                 }
 
-                Text("Load the client ID and secret from a client_secret.json file downloaded from Google Cloud Console. The values are stored, so this is only needed once.")
+                Text("Import a Desktop app OAuth client JSON from Google Cloud Console. The values are stored, so this is only needed once.")
                     .font(.caption)
                     .foregroundStyle(AppTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -46,7 +46,7 @@ struct OAuthClientSettingsView: View {
 
             if channels.usesCustomOAuthClient {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Use this only when you want uploads to run through your own Google Cloud project and YouTube API quota.")
+                    Text("Newly connected channels use your Google Cloud project and YouTube API quota. Reconnect existing channels to move them to this client.")
                         .font(.caption)
                         .foregroundStyle(AppTheme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -81,7 +81,7 @@ struct OAuthClientSettingsView: View {
 
     private var statusDetail: String {
         if channels.usesCustomOAuthClient {
-            return "Expert mode replaces the app client with your own Google Cloud OAuth client."
+            return "New connections use your Google Cloud OAuth client. Existing channels keep the client that authorized them."
         }
 
         return channels.hasBundledOAuthConfig

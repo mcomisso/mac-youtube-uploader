@@ -50,20 +50,33 @@ actor ChunkAssembler {
         )
 
         var cursor = CMTime.zero
+        var videoTransform: CGAffineTransform?
 
         onProgress(0)
 
         for url in sourceURLs {
             let asset = AVURLAsset(url: url)
             let duration = try await asset.load(.duration)
-
-            if let assetVideoTrack = try await asset.loadTracks(withMediaType: .video).first {
-                try videoTrack.insertTimeRange(
-                    CMTimeRange(start: .zero, duration: duration),
-                    of: assetVideoTrack,
-                    at: cursor
-                )
+            guard duration.isNumeric, duration > .zero,
+                  let assetVideoTrack = try await asset.loadTracks(withMediaType: .video).first else {
+                throw AppError.exportFailed("\(url.lastPathComponent) has no playable video track.")
             }
+
+            let sourceTransform = try await assetVideoTrack.load(.preferredTransform)
+            if let videoTransform {
+                guard videoTransform == sourceTransform else {
+                    throw AppError.exportFailed("The selected videos have incompatible orientations or dimensions. Combine videos with matching camera settings.")
+                }
+            } else {
+                videoTransform = sourceTransform
+                videoTrack.preferredTransform = sourceTransform
+            }
+
+            try videoTrack.insertTimeRange(
+                CMTimeRange(start: .zero, duration: duration),
+                of: assetVideoTrack,
+                at: cursor
+            )
 
             if let assetAudioTrack = try await asset.loadTracks(withMediaType: .audio).first,
                let audioTrack {
@@ -81,7 +94,7 @@ actor ChunkAssembler {
         try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
         let outputURL = outputDirectory
-            .appendingPathComponent("\(await titleSeed.sanitizedFilenameComponent)-\(UUID().uuidString)")
+            .appendingPathComponent("\(titleSeed.sanitizedFilenameComponent)-\(UUID().uuidString)")
             .appendingPathExtension("mov")
 
         guard let exporter = AVAssetExportSession(
